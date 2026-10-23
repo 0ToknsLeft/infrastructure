@@ -55,18 +55,6 @@ deploy-app: tf_outputs.json ssh_key.pem $(PFX)
 	uvx --from "$(DEPLOY_SOURCE)" setup-webapp "$$target" v$(APP_VERSION) \
 		--env-file "$$env_file" --certificate $(PFX)
 
-.PHONY: deploy-app
-deploy-app: tf_outputs.json ssh_key.pem $(PFX)
-	$(if $(host),,$(error usage: make deploy-app host=<instance-id>))
-	@target="$$(jq -er --arg id '$(host)' '.ec2_instances[$$id] // error("unknown instance \($$id)") | "\(.user)@\(.host)"' $<)" && \
-	env_file="$$(mktemp)" && trap 'rm -f "$$env_file"' EXIT && \
-	jq -er '"ConnectionStrings__Default=\"\(.connection_string_ef_core)\""' $< > "$$env_file" && \
-	TODOAPP_CERTIFICATE_PASSWORD="$$(cat $(PFX_PASSWORD))" \
-	ANSIBLE_PRIVATE_KEY_FILE="$(CURDIR)/ssh_key.pem" \
-	ANSIBLE_HOST_KEY_CHECKING=False \
-	uvx --from "$(DEPLOY_SOURCE)" setup-webapp "$$target" v$(APP_VERSION) \
-		--env-file "$$env_file" --certificate $(PFX)
-
 .PHONY: migrate
 migrate: tf_outputs.json
 	@ConnectionStrings__Default="$$(jq -r .connection_string_ef_core $<)" \
