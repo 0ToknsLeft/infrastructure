@@ -37,6 +37,27 @@ resource "aws_security_group" "ssh" {
 }
 
 # -----------------------------------------------------------------------------
+# Security Group (Port 80 for HTTP)
+# -----------------------------------------------------------------------------
+resource "aws_security_group" "http" {
+  name        = "app-server-http-sg"
+  description = "Allow inbound HTTP traffic from anywhere"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "HTTP public access"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "app-server-http-sg"
+  }
+}
+
+# -----------------------------------------------------------------------------
 # EC2 Instance (Ubuntu 24.04 on t2.micro)
 # -----------------------------------------------------------------------------
 data "aws_ami" "ubuntu" {
@@ -54,7 +75,7 @@ resource "aws_instance" "app" {
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public_1.id
   key_name               = aws_key_pair.ssh.key_name
-  vpc_security_group_ids = [aws_security_group.ssh.id]
+  vpc_security_group_ids = [aws_security_group.ssh.id, aws_security_group.http.id]
 
   # Avoid replacing the instance whenever a newer AMI is published
   lifecycle {
