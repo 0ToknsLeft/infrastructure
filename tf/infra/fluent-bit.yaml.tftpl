@@ -1,0 +1,47 @@
+#cloud-config
+apt:
+  sources:
+    fluent-bit:
+      source: "deb [signed-by=$KEY_FILE] https://packages.fluentbit.io/ubuntu/noble noble main"
+      key: |
+        ${indent(8, chomp(fluent_bit_key))}
+
+packages:
+  - fluent-bit
+
+write_files:
+  - path: /etc/fluent-bit/fluent-bit.conf
+    defer: true
+    content: |
+      [INPUT]
+          Name            systemd
+          Tag             app
+          Systemd_Filter  _SYSTEMD_UNIT=todoapp.service
+          DB              /var/lib/fluent-bit/app.db
+
+      [INPUT]
+          Name            systemd
+          Tag             dapr
+          Systemd_Filter  _SYSTEMD_UNIT=todoapp-dapr.service
+          DB              /var/lib/fluent-bit/dapr.db
+
+      [OUTPUT]
+          Name             cloudwatch_logs
+          Match            app
+          region           ${region}
+          log_group_name   ${app_log_group}
+          log_stream_name  ${log_stream}
+          log_key          MESSAGE
+
+      [OUTPUT]
+          Name             cloudwatch_logs
+          Match            dapr
+          region           ${region}
+          log_group_name   ${dapr_log_group}
+          log_stream_name  ${log_stream}
+          log_key          MESSAGE
+
+runcmd:
+  - mkdir -p /var/lib/fluent-bit
+  - systemctl enable fluent-bit
+  - systemctl restart fluent-bit
