@@ -1,3 +1,2 @@
-.db-pass filter=git-crypt diff=git-crypt
 tf/db/terraform.tfstate filter=git-crypt diff=git-crypt
 tf/infra/terraform.tfstate filter=git-crypt diff=git-crypt

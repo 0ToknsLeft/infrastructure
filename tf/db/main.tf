@@ -5,16 +5,18 @@ terraform {
       source  = "muecahit94/mssql"
       version = "~> 1.8" # Current release: 1.8.2
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.8"
+    }
   }
 }
 
-# -----------------------------------------------------------------------------
-# Variables
-# -----------------------------------------------------------------------------
-variable "db_password" {
-  description = "Password for the isolated 'todo-app' user (must be >= 8 chars with complexity)"
-  type        = string
-  sensitive   = true
+# Generate a strong password for the isolated 'todo-app' user
+resource "random_password" "db_password" {
+  length           = 24
+  special          = true
+  override_special = "!#$%&*()-_+[]<>:?"
 }
 
 # -----------------------------------------------------------------------------
@@ -46,7 +48,7 @@ provider "mssql" {
 # 1. Create the server-level login for 'todo-app'
 resource "mssql_sql_login" "todo_app" {
   name     = "todo_app_user"
-  password = var.db_password
+  password = random_password.db_password.result
 }
 
 # 2. Create the empty database for 'todo-app'
@@ -68,6 +70,6 @@ resource "mssql_sql_user" "todo_app" {
 # -----------------------------------------------------------------------------
 output "connection_string_ef_core" {
   description = "EF Core / .NET SqlClient connection string for todo-app"
-  value       = "Server=${local.infra.db_address},${local.infra.db_port};Database=${mssql_sql_user.todo_app.database_name};User Id=${mssql_sql_login.todo_app.name};Password=${var.db_password};Encrypt=True;TrustServerCertificate=True;"
+  value       = "Server=${local.infra.db_address},${local.infra.db_port};Database=${mssql_sql_user.todo_app.database_name};User Id=${mssql_sql_login.todo_app.name};Password=${random_password.db_password.result};Encrypt=True;TrustServerCertificate=True;"
   sensitive   = true
 }

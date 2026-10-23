@@ -1,8 +1,6 @@
 SHELL := $(shell command -v bash)
 rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
-DB_PASS=$(file < .db-pass)
-
 APP_VERSION=0.1.0
 REPOSITORY=0toknsleft/todo-app
 APP_IMAGE = ghcr.io/$(REPOSITORY):$(APP_VERSION)
@@ -35,8 +33,7 @@ migrate: tf_outputs.json
 	docker run --rm --platform linux/amd64 -e ConnectionStrings__Default $(APP_IMAGE) migrate
 
 $(DB_DIR)/terraform.tfstate: $(INFRA_DIR)/terraform.tfstate $(DB_FILES)
-	@TF_VAR_db_password=$(DB_PASS) \
-	terraform -chdir=$(DB_DIR) apply -auto-approve
+	@terraform -chdir=$(DB_DIR) apply -auto-approve
 
 $(INFRA_DIR)/terraform.tfstate: $(INFRA_FILES)
 	@terraform -chdir=$(INFRA_DIR) apply -auto-approve
