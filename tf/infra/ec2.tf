@@ -69,18 +69,18 @@ resource "aws_instance" "app" {
 # -----------------------------------------------------------------------------
 # Outputs
 # -----------------------------------------------------------------------------
-output "app_public_ip" {
-  description = "Public IP of the app server"
-  value       = aws_instance.app.public_ip
+output "ec2_instances" {
+  description = "SSH connection details for each EC2 instance, keyed by instance id"
+  value = {
+    for instance in [aws_instance.app] : instance.id => {
+      host = instance.public_ip
+      user = "ubuntu"
+    }
+  }
 }
 
-output "app_ssh_user" {
-  description = "SSH user for the app server"
-  value       = "ec2-user"
-}
-
-output "app_ssh_private_key" {
-  description = "Private SSH key for the app server"
+output "ssh_private_key" {
+  description = "Private SSH key shared by all EC2 instances"
   value       = tls_private_key.ssh.private_key_openssh
   sensitive   = true
 }
