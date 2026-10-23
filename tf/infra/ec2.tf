@@ -45,11 +45,11 @@ resource "aws_security_group" "http" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "HTTP public access"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    description     = "HTTP from the load balancer"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
   }
 
   tags = {
