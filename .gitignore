@@ -1,2 +1,3 @@
 tf/*/.terraform/providers/registry.terraform.io
 tf_outputs.json
+tf/*/terraform.tfstate.backup
