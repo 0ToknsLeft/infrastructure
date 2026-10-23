@@ -23,6 +23,11 @@ setup:
 	terraform -chdir=$(INFRA_DIR) init -lockfile=readonly
 	terraform -chdir=$(DB_DIR) init -lockfile=readonly
 
+.PHONY: infrastructure
+infrastructure:
+	@terraform -chdir=$(INFRA_DIR) apply -auto-approve
+	@terraform -chdir=$(DB_DIR) apply -auto-approve
+
 .PHONY: clean
 clean:
 	rm -f tf_outputs.json ssh_key.pem
