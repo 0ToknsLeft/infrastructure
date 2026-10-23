@@ -1,0 +1,86 @@
+# Generate the SSH key pair; the private key lives in the encrypted state
+resource "tls_private_key" "ssh" {
+  algorithm = "ED25519"
+}
+
+resource "aws_key_pair" "ssh" {
+  key_name   = "app-server-key"
+  public_key = tls_private_key.ssh.public_key_openssh
+}
+
+# -----------------------------------------------------------------------------
+# Security Group (Port 22 for SSH)
+# -----------------------------------------------------------------------------
+resource "aws_security_group" "ssh" {
+  name        = "app-server-ssh-sg"
+  description = "Allow inbound SSH traffic from anywhere"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "SSH public access"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "app-server-ssh-sg"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# EC2 Instance (Ubuntu 24.04 on t2.micro)
+# -----------------------------------------------------------------------------
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
+}
+
+resource "aws_instance" "app" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.public_1.id
+  key_name               = aws_key_pair.ssh.key_name
+  vpc_security_group_ids = [aws_security_group.ssh.id]
+
+  # Avoid replacing the instance whenever a newer AMI is published
+  lifecycle {
+    ignore_changes = [ami]
+  }
+
+  tags = {
+    Name = "app-server"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Outputs
+# -----------------------------------------------------------------------------
+output "app_public_ip" {
+  description = "Public IP of the app server"
+  value       = aws_instance.app.public_ip
+}
+
+output "app_ssh_user" {
+  description = "SSH user for the app server"
+  value       = "ec2-user"
+}
+
+output "app_ssh_private_key" {
+  description = "Private SSH key for the app server"
+  value       = tls_private_key.ssh.private_key_openssh
+  sensitive   = true
+}
