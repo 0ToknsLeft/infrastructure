@@ -58,7 +58,7 @@ resource "aws_security_group" "http" {
 }
 
 # -----------------------------------------------------------------------------
-# EC2 Instance (Ubuntu 24.04 on t2.micro)
+# EC2 Instances (Ubuntu 24.04 on t2.micro), one per public subnet
 # -----------------------------------------------------------------------------
 data "aws_ami" "ubuntu" {
   most_recent = true
@@ -71,9 +71,10 @@ data "aws_ami" "ubuntu" {
 }
 
 resource "aws_instance" "app" {
+  count                  = 2
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t2.micro"
-  subnet_id              = aws_subnet.public_1.id
+  subnet_id              = [aws_subnet.public_1.id, aws_subnet.public_2.id][count.index]
   key_name               = aws_key_pair.ssh.key_name
   vpc_security_group_ids = [aws_security_group.ssh.id, aws_security_group.http.id]
 
@@ -83,8 +84,14 @@ resource "aws_instance" "app" {
   }
 
   tags = {
-    Name = "app-server"
+    Name = "app-server-${count.index + 1}"
+    Role = "app"
   }
+}
+
+moved {
+  from = aws_instance.app
+  to   = aws_instance.app[0]
 }
 
 # -----------------------------------------------------------------------------
@@ -93,7 +100,7 @@ resource "aws_instance" "app" {
 output "ec2_instances" {
   description = "SSH connection details for each EC2 instance, keyed by instance id"
   value = {
-    for instance in [aws_instance.app] : instance.id => {
+    for instance in aws_instance.app : instance.id => {
       host = instance.public_ip
       user = "ubuntu"
     }
