@@ -20,12 +20,18 @@ setup:
 
 .PHONY: clean
 clean:
-	rm -f tf_outputs.json
+	rm -f tf_outputs.json ssh_key.pem
 
 .PHONY: destroy
 destroy: clean
 	terraform -chdir=$(INFRA_DIR) destroy -auto-approve
 	rm -f $(INFRA_DIR)/terraform.tfstate $(DB_DIR)/terraform.tfstate
+
+.PHONY: ssh
+ssh: tf_outputs.json ssh_key.pem
+	$(if $(host),,$(error usage: make ssh host=<instance-id>))
+	@target="$$(jq -er --arg id '$(host)' '.ec2_instances[$$id] // error("unknown instance \($$id)") | "\(.user)@\(.host)"' $<)" && \
+	exec ssh -i ssh_key.pem "$$target"
 
 .PHONY: migrate
 migrate: tf_outputs.json
@@ -44,3 +50,6 @@ tf_outputs.json: $(INFRA_DIR)/terraform.tfstate $(DB_DIR)/terraform.tfstate
 		<(terraform -chdir=$(INFRA_DIR) output -json | jq 'map_values(.value)') \
 		<(terraform -chdir=$(DB_DIR) output -json | jq 'map_values(.value)') \
 		> $@
+
+ssh_key.pem: tf_outputs.json
+	@(umask 077 && jq -r .ssh_private_key $< > $@)
