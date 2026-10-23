@@ -24,6 +24,11 @@ setup:
 clean:
 	rm -f tf_outputs.json
 
+.PHONY: destroy
+destroy: clean
+	terraform -chdir=$(INFRA_DIR) destroy -auto-approve
+	rm -f $(INFRA_DIR)/terraform.tfstate $(DB_DIR)/terraform.tfstate
+
 .PHONY: migrate
 migrate: tf_outputs.json
 	@ConnectionStrings__Default="$$(jq -r .connection_string_ef_core $<)" \
