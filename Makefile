@@ -1,7 +1,7 @@
 SHELL := $(shell command -v bash)
 rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
-APP_VERSION=0.1.1
+APP_VERSION=0.1.2
 REPOSITORY=0toknsleft/todo-app
 APP_IMAGE = ghcr.io/$(REPOSITORY):$(APP_VERSION)
 DEPLOY_SOURCE = git+https://github.com/$(REPOSITORY)@v$(APP_VERSION)\#subdirectory=deploy
@@ -45,14 +45,16 @@ ssh: tf_outputs.json ssh_key.pem
 
 .PHONY: deploy-app
 deploy-app: tf_outputs.json ssh_key.pem $(PFX)
-	$(if $(host),,$(error usage: make deploy-app host=<instance-id>))
-	@target="$$(jq -er --arg id '$(host)' '.ec2_instances[$$id] // error("unknown instance \($$id)") | "\(.user)@\(.host)"' $<)" && \
+	@targets="$$(aws ec2 describe-instances --region "$$(jq -er .aws_region $<)" \
+		--filters Name=tag:Role,Values=app Name=instance-state-name,Values=running \
+		--query 'Reservations[].Instances[].PublicIpAddress' --output json | \
+		jq -er 'if length > 0 then map("ubuntu@\(.)") | join(" ") else error("no running instances tagged Role=app") end')" && \
 	env_file="$$(mktemp)" && trap 'rm -f "$$env_file"' EXIT && \
 	jq -er '"ConnectionStrings__Default=\"\(.connection_string_ef_core)\""' $< > "$$env_file" && \
 	TODOAPP_CERTIFICATE_PASSWORD="$$(cat $(PFX_PASSWORD))" \
 	ANSIBLE_PRIVATE_KEY_FILE="$(CURDIR)/ssh_key.pem" \
 	ANSIBLE_HOST_KEY_CHECKING=False \
-	uvx --from "$(DEPLOY_SOURCE)" setup-webapp "$$target" v$(APP_VERSION) \
+	uvx --from "$(DEPLOY_SOURCE)" setup-webapp $$targets --version v$(APP_VERSION) \
 		--env-file "$$env_file" --certificate $(PFX)
 
 .PHONY: migrate

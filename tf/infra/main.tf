@@ -28,3 +28,11 @@ variable "aws_region" {
   type        = string
   default     = "eu-central-1"
 }
+
+# -----------------------------------------------------------------------------
+# Outputs
+# -----------------------------------------------------------------------------
+output "aws_region" {
+  description = "AWS region the resources are deployed into"
+  value       = var.aws_region
+}
