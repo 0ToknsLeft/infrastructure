@@ -58,6 +58,30 @@ resource "aws_security_group" "http" {
 }
 
 # -----------------------------------------------------------------------------
+# IAM Role the app instances run as
+# -----------------------------------------------------------------------------
+data "aws_iam_policy_document" "app_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "app" {
+  name               = "app-server-role"
+  assume_role_policy = data.aws_iam_policy_document.app_assume_role.json
+}
+
+resource "aws_iam_instance_profile" "app" {
+  name = "app-server-profile"
+  role = aws_iam_role.app.name
+}
+
+# -----------------------------------------------------------------------------
 # EC2 Instances (Ubuntu 24.04 on t2.micro), one per public subnet
 # -----------------------------------------------------------------------------
 data "aws_ami" "ubuntu" {
@@ -77,6 +101,7 @@ resource "aws_instance" "app" {
   subnet_id              = [aws_subnet.public_1.id, aws_subnet.public_2.id][count.index]
   key_name               = aws_key_pair.ssh.key_name
   vpc_security_group_ids = [aws_security_group.ssh.id, aws_security_group.http.id]
+  iam_instance_profile   = aws_iam_instance_profile.app.name
 
   # Avoid replacing the instance whenever a newer AMI is published
   lifecycle {
