@@ -49,14 +49,13 @@ deploy-app: tf_outputs.json ssh_key.pem $(PFX)
 		--filters Name=tag:Role,Values=app Name=instance-state-name,Values=running \
 		--query 'Reservations[].Instances[].PublicIpAddress' --output json | \
 		jq -er 'if length > 0 then map("ubuntu@\(.)") | join(" ") else error("no running instances tagged Role=app") end')" && \
-	env_file="$$(mktemp)" && settings_file="$$(mktemp)" && trap 'rm -f "$$env_file" "$$settings_file"' EXIT && \
+	env_file="$$(mktemp)" && trap 'rm -f "$$env_file"' EXIT && \
 	jq -er '"ConnectionStrings__Default=\"\(.connection_string_ef_core)\""' $< > "$$env_file" && \
-	jq -e '{TrustedProxies: {Networks: [.vpc_cidr_block]}}' $< > "$$settings_file" && \
 	TODOAPP_CERTIFICATE_PASSWORD="$$(cat $(PFX_PASSWORD))" \
 	ANSIBLE_PRIVATE_KEY_FILE="$(CURDIR)/ssh_key.pem" \
 	ANSIBLE_HOST_KEY_CHECKING=False \
 	uvx --from "$(DEPLOY_SOURCE)" setup-webapp $$targets --version v$(APP_VERSION) \
-		--env-file "$$env_file" --settings "$$settings_file" --certificate $(PFX)
+		--env-file "$$env_file" --certificate $(PFX)
 
 .PHONY: migrate
 migrate: tf_outputs.json

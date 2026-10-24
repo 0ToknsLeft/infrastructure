@@ -67,11 +67,3 @@ resource "aws_route_table_association" "b" {
   subnet_id      = aws_subnet.public_2.id
   route_table_id = aws_route_table.public.id
 }
-
-# -----------------------------------------------------------------------------
-# Outputs
-# -----------------------------------------------------------------------------
-output "vpc_cidr_block" {
-  description = "CIDR range of the VPC, which the load balancer's addresses come from"
-  value       = aws_vpc.main.cidr_block
-}
