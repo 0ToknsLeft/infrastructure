@@ -28,6 +28,11 @@ infrastructure:
 	@terraform -chdir=$(INFRA_DIR) apply -auto-approve
 	@terraform -chdir=$(DB_DIR) apply -auto-approve
 
+.PHONY: infra-plan
+infra-plan:
+	@terraform -chdir=$(INFRA_DIR) plan
+	@terraform -chdir=$(DB_DIR) plan
+
 .PHONY: clean
 clean:
 	rm -f tf_outputs.json ssh_key.pem
