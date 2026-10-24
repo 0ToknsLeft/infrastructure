@@ -19,25 +19,11 @@ write_files:
           Systemd_Filter  _SYSTEMD_UNIT=todoapp.service
           DB              /var/lib/fluent-bit/app.db
 
-      [INPUT]
-          Name            systemd
-          Tag             dapr
-          Systemd_Filter  _SYSTEMD_UNIT=todoapp-dapr.service
-          DB              /var/lib/fluent-bit/dapr.db
-
       [OUTPUT]
           Name             cloudwatch_logs
           Match            app
           region           ${region}
           log_group_name   ${app_log_group}
-          log_stream_name  ${log_stream}
-          log_key          MESSAGE
-
-      [OUTPUT]
-          Name             cloudwatch_logs
-          Match            dapr
-          region           ${region}
-          log_group_name   ${dapr_log_group}
           log_stream_name  ${log_stream}
           log_key          MESSAGE
 

@@ -103,13 +103,12 @@ resource "aws_instance" "app" {
   vpc_security_group_ids = [aws_security_group.ssh.id, aws_security_group.http.id]
   iam_instance_profile   = aws_iam_instance_profile.app.name
 
-  # Ship the app's and its sidecar's journal to CloudWatch with Fluent Bit.
+  # Ship the app's journal to CloudWatch with Fluent Bit.
   # cloud-init runs this on first boot only, so changing it replaces the instance
   user_data = templatefile("${path.module}/fluent-bit.yaml.tftpl", {
     fluent_bit_key = file("${path.module}/fluent-bit.key")
     region         = var.aws_region
     app_log_group  = aws_cloudwatch_log_group.app.name
-    dapr_log_group = aws_cloudwatch_log_group.dapr.name
     log_stream     = "app-server-${count.index + 1}"
   })
   user_data_replace_on_change = true

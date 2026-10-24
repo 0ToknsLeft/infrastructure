@@ -1,26 +1,18 @@
 # -----------------------------------------------------------------------------
-# CloudWatch Log Groups for the app and its Dapr sidecar
+# CloudWatch Log Group for the app
 # -----------------------------------------------------------------------------
 resource "aws_cloudwatch_log_group" "app" {
   name              = "/todoapp/app"
   retention_in_days = 30
 }
 
-resource "aws_cloudwatch_log_group" "dapr" {
-  name              = "/todoapp/dapr"
-  retention_in_days = 30
-}
-
 # -----------------------------------------------------------------------------
-# Let the app instances write to the log groups
+# Let the app instances write to the log group
 # -----------------------------------------------------------------------------
 data "aws_iam_policy_document" "app_logs" {
   statement {
-    actions = ["logs:CreateLogStream", "logs:PutLogEvents"]
-    resources = [
-      "${aws_cloudwatch_log_group.app.arn}:*",
-      "${aws_cloudwatch_log_group.dapr.arn}:*",
-    ]
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${aws_cloudwatch_log_group.app.arn}:*"]
   }
 }
 
@@ -34,9 +26,8 @@ resource "aws_iam_role_policy" "app_logs" {
 # Outputs
 # -----------------------------------------------------------------------------
 output "log_groups" {
-  description = "CloudWatch log groups of the app and its Dapr sidecar"
+  description = "CloudWatch log groups of the app"
   value = {
-    app  = aws_cloudwatch_log_group.app.name
-    dapr = aws_cloudwatch_log_group.dapr.name
+    app = aws_cloudwatch_log_group.app.name
   }
 }
