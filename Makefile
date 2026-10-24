@@ -9,6 +9,8 @@ DEPLOY_SOURCE = git+https://github.com/$(REPOSITORY)@v$(APP_VERSION)\#subdirecto
 TF_DIR=tf
 INFRA_DIR=$(TF_DIR)/infra
 DB_DIR=$(TF_DIR)/db
+INFRA_OUTPUT = terraform -chdir=$(INFRA_DIR) output
+DB_OUTPUT = terraform -chdir=$(DB_DIR) output
 
 SECRETS_DIR=secrets
 PFX=$(SECRETS_DIR)/dataprotection.pfx
@@ -35,7 +37,7 @@ infra-plan:
 
 .PHONY: clean
 clean:
-	rm -f tf_outputs.json ssh_key.pem
+	rm -f ssh_key.pem
 
 .PHONY: destroy
 destroy: clean
@@ -43,19 +45,20 @@ destroy: clean
 	rm -f $(INFRA_DIR)/terraform.tfstate $(DB_DIR)/terraform.tfstate
 
 .PHONY: ssh
-ssh: tf_outputs.json ssh_key.pem
+ssh: ssh_key.pem
 	$(if $(host),,$(error usage: make ssh host=<instance-id>))
-	@target="$$(jq -er --arg id '$(host)' '.ec2_instances[$$id] // error("unknown instance \($$id)") | "\(.user)@\(.host)"' $<)" && \
+	@target="$$($(INFRA_OUTPUT) -json ec2_instances | \
+		jq -er --arg id '$(host)' '.[$$id] // error("unknown instance \($$id)") | "\(.user)@\(.host)"')" && \
 	exec ssh -i ssh_key.pem "$$target"
 
 .PHONY: deploy-app
-deploy-app: tf_outputs.json ssh_key.pem $(PFX)
-	@targets="$$(aws ec2 describe-instances --region "$$(jq -er .aws_region $<)" \
+deploy-app: $(DB_DIR)/terraform.tfstate ssh_key.pem $(PFX)
+	@targets="$$(aws ec2 describe-instances --region "$$($(INFRA_OUTPUT) -raw aws_region)" \
 		--filters Name=tag:Role,Values=app Name=instance-state-name,Values=running \
 		--query 'Reservations[].Instances[].PublicIpAddress' --output json | \
 		jq -er 'if length > 0 then map("ubuntu@\(.)") | join(" ") else error("no running instances tagged Role=app") end')" && \
 	env_file="$$(mktemp)" && trap 'rm -f "$$env_file"' EXIT && \
-	jq -er '"ConnectionStrings__Default=\"\(.connection_string_ef_core)\""' $< > "$$env_file" && \
+	printf 'ConnectionStrings__Default="%s"\n' "$$($(DB_OUTPUT) -raw connection_string_ef_core)" > "$$env_file" && \
 	TODOAPP_CERTIFICATE_PASSWORD="$$(cat $(PFX_PASSWORD))" \
 	ANSIBLE_PRIVATE_KEY_FILE="$(CURDIR)/ssh_key.pem" \
 	ANSIBLE_HOST_KEY_CHECKING=False \
@@ -63,8 +66,8 @@ deploy-app: tf_outputs.json ssh_key.pem $(PFX)
 		--env-file "$$env_file" --certificate $(PFX)
 
 .PHONY: migrate
-migrate: tf_outputs.json
-	@ConnectionStrings__Default="$$(jq -r .connection_string_ef_core $<)" \
+migrate: $(DB_DIR)/terraform.tfstate
+	@ConnectionStrings__Default="$$($(DB_OUTPUT) -raw connection_string_ef_core)" \
 	docker run --rm --platform linux/amd64 -e ConnectionStrings__Default $(APP_IMAGE) migrate
 
 $(DB_DIR)/terraform.tfstate: $(INFRA_DIR)/terraform.tfstate $(DB_FILES)
@@ -73,15 +76,8 @@ $(DB_DIR)/terraform.tfstate: $(INFRA_DIR)/terraform.tfstate $(DB_FILES)
 $(INFRA_DIR)/terraform.tfstate: $(INFRA_FILES)
 	@terraform -chdir=$(INFRA_DIR) apply -auto-approve
 
-
-tf_outputs.json: $(INFRA_DIR)/terraform.tfstate $(DB_DIR)/terraform.tfstate
-	@jq -s '.[0] * .[1]' \
-		<(terraform -chdir=$(INFRA_DIR) output -json | jq 'map_values(.value)') \
-		<(terraform -chdir=$(DB_DIR) output -json | jq 'map_values(.value)') \
-		> $@
-
-ssh_key.pem: tf_outputs.json
-	@(umask 077 && jq -r .ssh_private_key $< > $@)
+ssh_key.pem: $(INFRA_DIR)/terraform.tfstate
+	@(umask 077 && $(INFRA_OUTPUT) -raw ssh_private_key > $@)
 
 $(PFX_PASSWORD):
 	@(umask 077 && openssl rand -hex 32 > $@)
