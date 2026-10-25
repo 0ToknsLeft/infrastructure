@@ -37,7 +37,7 @@ resource "aws_security_group" "ssh" {
 }
 
 # -----------------------------------------------------------------------------
-# Security Group (Port 80 for HTTP)
+# Security Group (Ports 80 and 443 for HTTP and HTTPS)
 # -----------------------------------------------------------------------------
 resource "aws_security_group" "http" {
   name        = "app-server-http-sg"
@@ -48,6 +48,14 @@ resource "aws_security_group" "http" {
     description = "HTTP public access"
     from_port   = 80
     to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS public access"
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
