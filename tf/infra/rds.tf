@@ -15,6 +15,19 @@ resource "aws_db_subnet_group" "main" {
 }
 
 # -----------------------------------------------------------------------------
+# Security Group marking the instances allowed to reach the database
+# -----------------------------------------------------------------------------
+resource "aws_security_group" "db_access" {
+  name        = "db-access-sg"
+  description = "Instances allowed to connect to the database"
+  vpc_id      = aws_vpc.main.id
+
+  tags = {
+    Name = "db-access-sg"
+  }
+}
+
+# -----------------------------------------------------------------------------
 # Security Group (Port 1433 for MS SQL Server)
 # -----------------------------------------------------------------------------
 resource "aws_security_group" "rds" {

@@ -99,7 +99,7 @@ resource "aws_instance" "app" {
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public_1.id
   key_name               = aws_key_pair.ssh.key_name
-  vpc_security_group_ids = [aws_security_group.ssh.id, aws_security_group.http.id]
+  vpc_security_group_ids = [aws_security_group.ssh.id, aws_security_group.http.id, aws_security_group.db_access.id]
   iam_instance_profile   = aws_iam_instance_profile.app.name
 
   # Ship the app's journal to CloudWatch with Fluent Bit.
