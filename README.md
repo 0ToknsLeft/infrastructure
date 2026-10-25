@@ -61,6 +61,11 @@ after.
    them the connection string and data protection certificate.
 4. Commit the `Makefile` and the state files, e.g. as `Deploy v<version>`.
 
+`make setup-tls host=<instance-id> domain=<domain> [email=<address>]` gets a
+Let's Encrypt certificate for the domain and serves the app over HTTPS on that
+instance, with the `setup-tls` tool. Point the domain at the instance and deploy
+the app first.
+
 `make ssh host=<instance-id>` opens a shell on an instance. The instance ids
 are listed by `terraform -chdir=tf/infra output ec2_instances`.
 

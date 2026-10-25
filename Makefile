@@ -74,6 +74,14 @@ deploy-app: $(DB_DIR)/terraform.tfstate ssh_key.pem $(PFX) ## Deploy the app to 
 	uvx --from "$(DEPLOY_SOURCE)" setup-webapp $$targets --version v$(APP_VERSION) \
 		--env-file "$$env_file" --certificate $(PFX)
 
+.PHONY: setup-tls
+setup-tls: ssh_key.pem ## Serve HTTPS on an instance (host=<instance-id> domain=<domain> [email=<address>])
+	$(if $(and $(host),$(domain)),,$(error usage: make setup-tls host=<instance-id> domain=<domain> [email=<address>]))
+	@target="$$($(INSTANCE_TARGET))" && \
+	ANSIBLE_PRIVATE_KEY_FILE="$(CURDIR)/ssh_key.pem" \
+	ANSIBLE_HOST_KEY_CHECKING=False \
+	uvx --from "$(DEPLOY_SOURCE)" setup-tls "$$target" '$(domain)' $(if $(email),--email '$(email)')
+
 .PHONY: migrate
 migrate: $(DB_DIR)/terraform.tfstate ssh_key.pem ## Run database migrations
 	@ConnectionStrings__Default="$$($(DB_OUTPUT) -raw connection_string_ef_core)" \
