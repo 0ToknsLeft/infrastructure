@@ -4,7 +4,8 @@ Run `make` to list the available commands.
 
 ## Connecting to the database
 
-`make db-tunnel` launches a temporary EC2 instance, forwards `127.0.0.1:1433`
+The database lives in private subnets and is only reachable from inside the
+VPC. `make db-tunnel` launches a temporary EC2 instance, forwards `127.0.0.1:1433`
 to the database through it and prints the connection details. Press Ctrl-C to
 close the tunnel; the instance is terminated.
 

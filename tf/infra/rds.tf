@@ -6,11 +6,11 @@ resource "random_password" "master_password" {
 }
 
 resource "aws_db_subnet_group" "main" {
-  name       = "rds-sqlserver-subnet-group"
-  subnet_ids = [aws_subnet.public_1.id, aws_subnet.public_2.id]
+  name       = "rds-sqlserver-private-subnet-group"
+  subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
 
   tags = {
-    Name = "RDS SQL Server public subnet group"
+    Name = "RDS SQL Server private subnet group"
   }
 }
 
@@ -31,27 +31,20 @@ resource "aws_security_group" "db_access" {
 # Security Group (Port 1433 for MS SQL Server)
 # -----------------------------------------------------------------------------
 resource "aws_security_group" "rds" {
-  name        = "rds-sqlserver-public-sg"
-  description = "Allow inbound MS SQL Server traffic from anywhere"
+  name        = "rds-sqlserver-private-sg"
+  description = "Allow inbound MS SQL Server traffic from the db-access security group"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "MS SQL Server public access"
-    from_port   = 1433
-    to_port     = 1433
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    description     = "MS SQL Server access from db-access instances"
+    from_port       = 1433
+    to_port         = 1433
+    protocol        = "tcp"
+    security_groups = [aws_security_group.db_access.id]
   }
 
   tags = {
-    Name = "rds-sqlserver-public-sg"
+    Name = "rds-sqlserver-private-sg"
   }
 }
 
@@ -71,8 +64,13 @@ resource "aws_db_instance" "default" {
   password               = random_password.master_password.result
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
-  publicly_accessible    = true
+  publicly_accessible    = false
   skip_final_snapshot    = true
+
+  # RDS cannot move to another subnet group in the same VPC, so recreate it instead
+  lifecycle {
+    replace_triggered_by = [aws_db_subnet_group.main]
+  }
 }
 
 # -----------------------------------------------------------------------------
