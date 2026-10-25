@@ -12,6 +12,7 @@ DB_DIR=$(TF_DIR)/db
 INFRA_OUTPUT = terraform -chdir=$(INFRA_DIR) output
 DB_OUTPUT = terraform -chdir=$(DB_DIR) output
 DB_TUNNEL = scripts/db-tunnel.sh
+DB_TUNNEL_VARS = -var db_host=127.0.0.1
 
 SECRETS_DIR=secrets
 PFX=$(SECRETS_DIR)/dataprotection.pfx
@@ -33,14 +34,14 @@ setup: ## Unlock secrets and initialise terraform
 	terraform -chdir=$(DB_DIR) init -lockfile=readonly
 
 .PHONY: infrastructure
-infrastructure: ## Apply the infra and db terraform
+infrastructure: ssh_key.pem ## Apply the infra and db terraform
 	@terraform -chdir=$(INFRA_DIR) apply -auto-approve
-	@terraform -chdir=$(DB_DIR) apply -auto-approve
+	@$(DB_TUNNEL) terraform -chdir=$(DB_DIR) apply -auto-approve $(DB_TUNNEL_VARS)
 
 .PHONY: infra-plan
-infra-plan: ## Show pending infra and db changes
+infra-plan: ssh_key.pem ## Show pending infra and db changes
 	@terraform -chdir=$(INFRA_DIR) plan
-	@terraform -chdir=$(DB_DIR) plan
+	@$(DB_TUNNEL) terraform -chdir=$(DB_DIR) plan $(DB_TUNNEL_VARS)
 
 .PHONY: clean
 clean: ## Remove the local SSH key
@@ -81,8 +82,8 @@ migrate: $(DB_DIR)/terraform.tfstate ## Run database migrations
 db-tunnel: ssh_key.pem ## Open a tunnel to the database
 	@$(DB_TUNNEL)
 
-$(DB_DIR)/terraform.tfstate: $(INFRA_DIR)/terraform.tfstate $(DB_FILES)
-	@terraform -chdir=$(DB_DIR) apply -auto-approve
+$(DB_DIR)/terraform.tfstate: $(INFRA_DIR)/terraform.tfstate $(DB_FILES) ssh_key.pem
+	@$(DB_TUNNEL) terraform -chdir=$(DB_DIR) apply -auto-approve $(DB_TUNNEL_VARS)
 
 $(INFRA_DIR)/terraform.tfstate: $(INFRA_FILES)
 	@terraform -chdir=$(INFRA_DIR) apply -auto-approve

@@ -12,6 +12,14 @@ terraform {
   }
 }
 
+# -----------------------------------------------------------------------------
+# Variables
+# -----------------------------------------------------------------------------
+variable "db_host" {
+  description = "Host the database is reached through, the local end of the db tunnel"
+  type        = string
+}
+
 # Generate a strong password for the isolated 'todo-app' user
 resource "random_password" "db_password" {
   length           = 24
@@ -37,7 +45,7 @@ locals {
 # SQL Server Configuration: Isolated 'todo-app' User & Empty DB for EF Core
 # -----------------------------------------------------------------------------
 provider "mssql" {
-  hostname = local.infra.db_address
+  hostname = var.db_host
   port     = local.infra.db_port
   sql_auth {
     username = local.infra.db_admin_username
