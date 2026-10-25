@@ -74,9 +74,10 @@ deploy-app: $(DB_DIR)/terraform.tfstate ssh_key.pem $(PFX) ## Deploy the app to 
 		--env-file "$$env_file" --certificate $(PFX)
 
 .PHONY: migrate
-migrate: $(DB_DIR)/terraform.tfstate ## Run database migrations
+migrate: $(DB_DIR)/terraform.tfstate ssh_key.pem ## Run database migrations
 	@ConnectionStrings__Default="$$($(DB_OUTPUT) -raw connection_string_ef_core)" \
-	docker run --rm --platform linux/amd64 -e ConnectionStrings__Default $(APP_IMAGE) migrate
+	$(DB_TUNNEL) docker run --rm --platform linux/amd64 -e ConnectionStrings__Default \
+		--add-host "$$($(INFRA_OUTPUT) -raw db_address):host-gateway" $(APP_IMAGE) migrate
 
 .PHONY: db-tunnel
 db-tunnel: ssh_key.pem ## Open a tunnel to the database
