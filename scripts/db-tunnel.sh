@@ -75,8 +75,20 @@ open_tunnel() {
 		-L "127.0.0.1:$db_port:$db_address:$db_port" "$target"
 }
 
+print_connection() {
+	terraform -chdir="$root/tf/db" output -json connection | jq -r --arg port "$db_port" '
+		"Database tunnel open. Connect with:",
+		"  Host:      127.0.0.1",
+		"  Port:      \($port)",
+		"  Database:  \(.database)",
+		"  User:      \(.username)",
+		"  Password:  run `terraform -chdir=tf/db output -json connection | jq -r .password`",
+		"  JDBC URL:  jdbc:sqlserver://127.0.0.1:\($port);databaseName=\(.database);encrypt=true;trustServerCertificate=true"'
+}
+
 hold_tunnel() {
-	log "tunnel open on 127.0.0.1:$db_port, press Ctrl-C to close it and terminate the instance"
+	print_connection
+	log "press Ctrl-C to close the tunnel and terminate the instance"
 	while ssh -S "$control_socket" -O check "$target" 2>/dev/null; do
 		sleep 5
 	done

@@ -81,3 +81,13 @@ output "connection_string_ef_core" {
   value       = "Server=${local.infra.db_address},${local.infra.db_port};Database=${mssql_sql_user.todo_app.database_name};User Id=${mssql_sql_login.todo_app.name};Password=${random_password.db_password.result};Encrypt=True;TrustServerCertificate=True;"
   sensitive   = true
 }
+
+output "connection" {
+  description = "Connection details of the todo-app login, for database clients"
+  value = {
+    database = mssql_sql_user.todo_app.database_name
+    username = mssql_sql_login.todo_app.name
+    password = random_password.db_password.result
+  }
+  sensitive = true
+}

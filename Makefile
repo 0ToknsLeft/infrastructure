@@ -80,7 +80,7 @@ migrate: $(DB_DIR)/terraform.tfstate ssh_key.pem ## Run database migrations
 		--add-host "$$($(INFRA_OUTPUT) -raw db_address):host-gateway" $(APP_IMAGE) migrate
 
 .PHONY: db-tunnel
-db-tunnel: ssh_key.pem ## Open a tunnel to the database
+db-tunnel: $(DB_DIR)/terraform.tfstate ssh_key.pem ## Open a tunnel to the database and print connection details
 	@$(DB_TUNNEL)
 
 $(DB_DIR)/terraform.tfstate: $(INFRA_DIR)/terraform.tfstate $(DB_FILES) ssh_key.pem
