@@ -19,40 +19,46 @@ PFX_PASSWORD=$(SECRETS_DIR)/dataprotection.password
 INFRA_FILES := $(call rwildcard,$(INFRA_DIR),*.tf)
 DB_FILES := $(call rwildcard,$(DB_DIR),*.tf)
 
+.DEFAULT_GOAL := help
+
+.PHONY: help
+help: ## Show this help
+	@awk 'BEGIN { FS = ":.*## " } /^[a-zA-Z_-]+:.*## / { printf "  %-16s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+
 .PHONY: setup
-setup:
+setup: ## Unlock secrets and initialise terraform
 	git-crypt unlock
 	terraform -chdir=$(INFRA_DIR) init -lockfile=readonly
 	terraform -chdir=$(DB_DIR) init -lockfile=readonly
 
 .PHONY: infrastructure
-infrastructure:
+infrastructure: ## Apply the infra and db terraform
 	@terraform -chdir=$(INFRA_DIR) apply -auto-approve
 	@terraform -chdir=$(DB_DIR) apply -auto-approve
 
 .PHONY: infra-plan
-infra-plan:
+infra-plan: ## Show pending infra and db changes
 	@terraform -chdir=$(INFRA_DIR) plan
 	@terraform -chdir=$(DB_DIR) plan
 
 .PHONY: clean
-clean:
+clean: ## Remove the local SSH key
 	rm -f ssh_key.pem
 
 .PHONY: destroy
-destroy: clean
+destroy: clean ## Tear down all infrastructure
 	terraform -chdir=$(INFRA_DIR) destroy -auto-approve
 	rm -f $(INFRA_DIR)/terraform.tfstate $(DB_DIR)/terraform.tfstate
 
 .PHONY: ssh
-ssh: ssh_key.pem
+ssh: ssh_key.pem ## SSH into an instance (host=<instance-id>)
 	$(if $(host),,$(error usage: make ssh host=<instance-id>))
 	@target="$$($(INFRA_OUTPUT) -json ec2_instances | \
 		jq -er --arg id '$(host)' '.[$$id] // error("unknown instance \($$id)") | "\(.user)@\(.host)"')" && \
 	exec ssh -i ssh_key.pem "$$target"
 
 .PHONY: deploy-app
-deploy-app: $(DB_DIR)/terraform.tfstate ssh_key.pem $(PFX)
+deploy-app: $(DB_DIR)/terraform.tfstate ssh_key.pem $(PFX) ## Deploy the app to every Role=app instance
 	@targets="$$(aws ec2 describe-instances --region "$$($(INFRA_OUTPUT) -raw aws_region)" \
 		--filters Name=tag:Role,Values=app Name=instance-state-name,Values=running \
 		--query 'Reservations[].Instances[].PublicIpAddress' --output json | \
@@ -66,7 +72,7 @@ deploy-app: $(DB_DIR)/terraform.tfstate ssh_key.pem $(PFX)
 		--env-file "$$env_file" --certificate $(PFX)
 
 .PHONY: migrate
-migrate: $(DB_DIR)/terraform.tfstate
+migrate: $(DB_DIR)/terraform.tfstate ## Run database migrations
 	@ConnectionStrings__Default="$$($(DB_OUTPUT) -raw connection_string_ef_core)" \
 	docker run --rm --platform linux/amd64 -e ConnectionStrings__Default $(APP_IMAGE) migrate
 
