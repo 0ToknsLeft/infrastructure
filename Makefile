@@ -1,7 +1,7 @@
 SHELL := $(shell command -v bash)
 rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
-APP_VERSION=0.1.2
+APP_VERSION=0.2.2
 REPOSITORY=0toknsleft/todo-app
 APP_IMAGE = ghcr.io/$(REPOSITORY):$(APP_VERSION)
 DEPLOY_SOURCE = git+https://github.com/$(REPOSITORY)@v$(APP_VERSION)\#subdirectory=deploy
