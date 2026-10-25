@@ -11,6 +11,8 @@ INFRA_DIR=$(TF_DIR)/infra
 DB_DIR=$(TF_DIR)/db
 INFRA_OUTPUT = terraform -chdir=$(INFRA_DIR) output
 DB_OUTPUT = terraform -chdir=$(DB_DIR) output
+INSTANCE_TARGET = $(INFRA_OUTPUT) -json ec2_instances | \
+	jq -er --arg id '$(host)' '.[$$id] // error("unknown instance \($$id)") | "\(.user)@\(.host)"'
 DB_TUNNEL = scripts/db-tunnel.sh
 DB_TUNNEL_VARS = -var db_host=127.0.0.1
 
@@ -55,8 +57,7 @@ destroy: clean ## Tear down all infrastructure
 .PHONY: ssh
 ssh: ssh_key.pem ## SSH into an instance (host=<instance-id>)
 	$(if $(host),,$(error usage: make ssh host=<instance-id>))
-	@target="$$($(INFRA_OUTPUT) -json ec2_instances | \
-		jq -er --arg id '$(host)' '.[$$id] // error("unknown instance \($$id)") | "\(.user)@\(.host)"')" && \
+	@target="$$($(INSTANCE_TARGET))" && \
 	exec ssh -i ssh_key.pem "$$target"
 
 .PHONY: deploy-app
