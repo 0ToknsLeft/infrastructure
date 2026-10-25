@@ -11,6 +11,7 @@ INFRA_DIR=$(TF_DIR)/infra
 DB_DIR=$(TF_DIR)/db
 INFRA_OUTPUT = terraform -chdir=$(INFRA_DIR) output
 DB_OUTPUT = terraform -chdir=$(DB_DIR) output
+DB_TUNNEL = scripts/db-tunnel.sh
 
 SECRETS_DIR=secrets
 PFX=$(SECRETS_DIR)/dataprotection.pfx
@@ -75,6 +76,10 @@ deploy-app: $(DB_DIR)/terraform.tfstate ssh_key.pem $(PFX) ## Deploy the app to 
 migrate: $(DB_DIR)/terraform.tfstate ## Run database migrations
 	@ConnectionStrings__Default="$$($(DB_OUTPUT) -raw connection_string_ef_core)" \
 	docker run --rm --platform linux/amd64 -e ConnectionStrings__Default $(APP_IMAGE) migrate
+
+.PHONY: db-tunnel
+db-tunnel: ssh_key.pem ## Open a tunnel to the database
+	@$(DB_TUNNEL)
 
 $(DB_DIR)/terraform.tfstate: $(INFRA_DIR)/terraform.tfstate $(DB_FILES)
 	@terraform -chdir=$(DB_DIR) apply -auto-approve

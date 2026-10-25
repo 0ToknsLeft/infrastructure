@@ -1,0 +1,22 @@
+#cloud-config
+# Fallback for when db-tunnel.sh dies without terminating the instance:
+# shut down (and so terminate) once no SSH connection is left
+write_files:
+  - path: /etc/ssh/sshd_config.d/keepalive.conf
+    content: |
+      ClientAliveInterval 30
+      ClientAliveCountMax 3
+  - path: /usr/local/sbin/shutdown-if-idle
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      [ "$(cut -d. -f1 /proc/uptime)" -lt 600 ] && exit 0
+      ss -Htn state established '( sport = :22 )' | grep -q . && exit 0
+      shutdown -h now
+  - path: /etc/cron.d/shutdown-if-idle
+    content: |
+      PATH=/usr/sbin:/usr/bin:/sbin:/bin
+      * * * * * root /usr/local/sbin/shutdown-if-idle
+
+runcmd:
+  - systemctl try-reload-or-restart ssh.service
