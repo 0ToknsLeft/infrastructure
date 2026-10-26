@@ -10,6 +10,12 @@ terraform {
       version = "~> 3.8"
     }
   }
+
+  # The bucket is created per account by `make setup` and passed to init
+  backend "s3" {
+    key          = "db.tfstate"
+    use_lockfile = true
+  }
 }
 
 # -----------------------------------------------------------------------------
@@ -17,6 +23,11 @@ terraform {
 # -----------------------------------------------------------------------------
 variable "db_host" {
   description = "Host the database is reached through, the local end of the db tunnel"
+  type        = string
+}
+
+variable "state_bucket" {
+  description = "S3 bucket holding the terraform state of both modules"
   type        = string
 }
 
@@ -31,9 +42,10 @@ resource "random_password" "db_password" {
 # Infra Outputs (RDS instance created by ../infra)
 # -----------------------------------------------------------------------------
 data "terraform_remote_state" "infra" {
-  backend = "local"
+  backend = "s3"
   config = {
-    path = "../infra/terraform.tfstate"
+    bucket = var.state_bucket
+    key    = "infra.tfstate"
   }
 }
 

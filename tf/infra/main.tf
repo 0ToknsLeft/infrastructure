@@ -14,6 +14,12 @@ terraform {
       version = "~> 4.1"
     }
   }
+
+  # The bucket is created per account by `make setup` and passed to init
+  backend "s3" {
+    key          = "infra.tfstate"
+    use_lockfile = true
+  }
 }
 
 provider "aws" {

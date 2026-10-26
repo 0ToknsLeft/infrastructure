@@ -1,9 +1,9 @@
 # Infrastructure
 
 Runs the [todo app](https://github.com/0toknsleft/todo-app) on AWS
-(`eu-central-1`): an EC2 instance serving HTTP on port 80, an RDS SQL Server
-Express database in private subnets, and the app's logs in CloudWatch
-(`/todoapp/app`).
+(`eu-central-1` unless `AWS_REGION` says otherwise): an EC2 instance serving
+HTTP on port 80, an RDS SQL Server Express database in private subnets, and the
+app's logs in CloudWatch (`/todoapp/app`).
 
 Run `make` to list the available commands.
 
@@ -15,15 +15,16 @@ Run `make` to list the available commands.
 - AWS CLI with credentials for the account
 - Docker, `jq`, `ssh`, [uv](https://docs.astral.sh/uv/) and GNU make
 
-Then run `make setup` once to unlock the secrets and initialise terraform.
+Then run `make setup` once to unlock the secrets, create the state bucket and
+initialise terraform. Nothing in the repository names an AWS account: the
+targets act on whichever account your AWS credentials belong to. Run
+`make setup` again after switching accounts.
 
 ## Secrets
 
-git-crypt encrypts the terraform state (`tf/*/terraform.tfstate`) and
-`secrets/`, see `.gitattributes`. Access is per GPG key: someone who already
-has access runs `git-crypt add-gpg-user <key-id>` and commits the result.
-Until the repository is unlocked the state files are unreadable and every
-target fails.
+git-crypt encrypts `secrets/`, see `.gitattributes`. Access is per GPG key:
+someone who already has access runs `git-crypt add-gpg-user <key-id>` and
+commits the result.
 
 - `secrets/dataprotection.pfx` and its password are the app's ASP.NET Core
   data protection certificate. `make deploy-app` generates them if missing.
@@ -45,9 +46,10 @@ There are two root modules:
 modules. Targets that depend on the state, such as `deploy-app`, `migrate` and
 `db-tunnel`, apply changed `.tf` files first.
 
-The state is local and committed to git, with no locking. Pull before applying,
-let only one person apply at a time, and commit the updated state files right
-after.
+The state of both modules lives in the S3 bucket
+`0toks-infrastructure-<account-id>-<region>`, which `make setup` creates with
+versioning enabled. Terraform locks it while applying, so several people can
+work against the same account.
 
 ## Deploying the app
 
@@ -59,7 +61,7 @@ after.
    uses the `setup-webapp` tool from the todo-app repository's `deploy/`
    directory, which configures the instances with Ansible over SSH and hands
    them the connection string and data protection certificate.
-4. Commit the `Makefile` and the state files, e.g. as `Deploy v<version>`.
+4. Commit the `Makefile`, e.g. as `Deploy v<version>`.
 
 `make setup-tls host=<instance-id> domain=<domain> [email=<address>]` gets a
 Let's Encrypt certificate for the domain and serves the app over HTTPS on that
@@ -87,5 +89,5 @@ password.
 ## Tearing down
 
 `make destroy` destroys everything in `tf/infra`, including the database
-(without a final snapshot, so its data is lost), and deletes both local state
-files.
+(without a final snapshot, so its data is lost), and deletes both state files
+from the bucket.

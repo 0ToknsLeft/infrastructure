@@ -6,6 +6,11 @@ REPOSITORY=0toknsleft/todo-app
 APP_IMAGE = ghcr.io/$(REPOSITORY):$(APP_VERSION)
 DEPLOY_SOURCE = git+https://github.com/$(REPOSITORY)@v$(APP_VERSION)\#subdirectory=deploy
 
+AWS_REGION ?= eu-central-1
+export AWS_REGION
+export TF_VAR_aws_region = $(AWS_REGION)
+STATE_BUCKET = 0toks-infrastructure-$(shell aws sts get-caller-identity --query Account --output text)-$(AWS_REGION)
+
 TF_DIR=tf
 INFRA_DIR=$(TF_DIR)/infra
 DB_DIR=$(TF_DIR)/db
@@ -14,7 +19,9 @@ DB_OUTPUT = terraform -chdir=$(DB_DIR) output
 INSTANCE_TARGET = $(INFRA_OUTPUT) -json ec2_instances | \
 	jq -er --arg id '$(host)' '.[$$id] // error("unknown instance \($$id)") | "\(.user)@\(.host)"'
 DB_TUNNEL = scripts/db-tunnel.sh
-DB_TUNNEL_VARS = -var db_host=127.0.0.1
+DB_TUNNEL_VARS = -var db_host=127.0.0.1 -var state_bucket=$(STATE_BUCKET)
+INFRA_APPLIED = $(INFRA_DIR)/.terraform/applied
+DB_APPLIED = $(DB_DIR)/.terraform/applied
 
 SECRETS_DIR=secrets
 PFX=$(SECRETS_DIR)/dataprotection.pfx
@@ -30,15 +37,20 @@ help: ## Show this help
 	@awk 'BEGIN { FS = ":.*## " } /^[a-zA-Z_-]+:.*## / { printf "  %-16s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 .PHONY: setup
-setup: ## Unlock secrets and initialise terraform
+setup: ## Unlock secrets, create the state bucket and initialise terraform
 	git-crypt unlock
-	terraform -chdir=$(INFRA_DIR) init -lockfile=readonly
-	terraform -chdir=$(DB_DIR) init -lockfile=readonly
+	@bucket=$(STATE_BUCKET) && \
+	{ aws s3api head-bucket --bucket "$$bucket" 2>/dev/null || aws s3 mb "s3://$$bucket"; } && \
+	aws s3api put-bucket-versioning --bucket "$$bucket" --versioning-configuration Status=Enabled && \
+	terraform -chdir=$(INFRA_DIR) init -reconfigure -lockfile=readonly -backend-config="bucket=$$bucket" && \
+	terraform -chdir=$(DB_DIR) init -reconfigure -lockfile=readonly -backend-config="bucket=$$bucket"
+	rm -f $(INFRA_APPLIED) $(DB_APPLIED)
 
 .PHONY: infrastructure
 infrastructure: ssh_key.pem ## Apply the infra and db terraform
 	@terraform -chdir=$(INFRA_DIR) apply -auto-approve
 	@$(DB_TUNNEL) terraform -chdir=$(DB_DIR) apply -auto-approve $(DB_TUNNEL_VARS)
+	@touch $(INFRA_APPLIED) $(DB_APPLIED)
 
 .PHONY: infra-plan
 infra-plan: ssh_key.pem ## Show pending infra and db changes
@@ -52,7 +64,9 @@ clean: ## Remove the local SSH key
 .PHONY: destroy
 destroy: clean ## Tear down all infrastructure
 	terraform -chdir=$(INFRA_DIR) destroy -auto-approve
-	rm -f $(INFRA_DIR)/terraform.tfstate $(DB_DIR)/terraform.tfstate
+	aws s3 rm s3://$(STATE_BUCKET)/infra.tfstate
+	aws s3 rm s3://$(STATE_BUCKET)/db.tfstate
+	rm -f $(INFRA_APPLIED) $(DB_APPLIED)
 
 .PHONY: ssh
 ssh: ssh_key.pem ## SSH into an instance (host=<instance-id>)
@@ -61,7 +75,7 @@ ssh: ssh_key.pem ## SSH into an instance (host=<instance-id>)
 	exec ssh -i ssh_key.pem "$$target"
 
 .PHONY: deploy-app
-deploy-app: $(DB_DIR)/terraform.tfstate ssh_key.pem $(PFX) ## Deploy the app to every Role=app instance
+deploy-app: $(DB_APPLIED) ssh_key.pem $(PFX) ## Deploy the app to every Role=app instance
 	@targets="$$(aws ec2 describe-instances --region "$$($(INFRA_OUTPUT) -raw aws_region)" \
 		--filters Name=tag:Role,Values=app Name=instance-state-name,Values=running \
 		--query 'Reservations[].Instances[].PublicIpAddress' --output json | \
@@ -83,22 +97,24 @@ setup-tls: ssh_key.pem ## Serve HTTPS on an instance (host=<instance-id> domain=
 	uvx --from "$(DEPLOY_SOURCE)" setup-tls "$$target" '$(domain)' $(if $(email),--email '$(email)')
 
 .PHONY: migrate
-migrate: $(DB_DIR)/terraform.tfstate ssh_key.pem ## Run database migrations
+migrate: $(DB_APPLIED) ssh_key.pem ## Run database migrations
 	@ConnectionStrings__Default="$$($(DB_OUTPUT) -raw connection_string_ef_core)" \
 	$(DB_TUNNEL) docker run --rm --platform linux/amd64 -e ConnectionStrings__Default \
 		--add-host "$$($(INFRA_OUTPUT) -raw db_address):host-gateway" $(APP_IMAGE) migrate
 
 .PHONY: db-tunnel
-db-tunnel: $(DB_DIR)/terraform.tfstate ssh_key.pem ## Open a tunnel to the database and print connection details
+db-tunnel: $(DB_APPLIED) ssh_key.pem ## Open a tunnel to the database and print connection details
 	@$(DB_TUNNEL)
 
-$(DB_DIR)/terraform.tfstate: $(INFRA_DIR)/terraform.tfstate $(DB_FILES) ssh_key.pem
+$(DB_APPLIED): $(INFRA_APPLIED) $(DB_FILES) ssh_key.pem
 	@$(DB_TUNNEL) terraform -chdir=$(DB_DIR) apply -auto-approve $(DB_TUNNEL_VARS)
+	@touch $@
 
-$(INFRA_DIR)/terraform.tfstate: $(INFRA_FILES)
+$(INFRA_APPLIED): $(INFRA_FILES)
 	@terraform -chdir=$(INFRA_DIR) apply -auto-approve
+	@touch $@
 
-ssh_key.pem: $(INFRA_DIR)/terraform.tfstate
+ssh_key.pem: $(INFRA_APPLIED)
 	@(umask 077 && $(INFRA_OUTPUT) -raw ssh_private_key > $@)
 
 $(PFX_PASSWORD):
