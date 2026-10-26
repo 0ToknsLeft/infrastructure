@@ -19,6 +19,7 @@ DB_OUTPUT = terraform -chdir=$(DB_DIR) output
 INSTANCE_TARGET = $(INFRA_OUTPUT) -json ec2_instances | \
 	jq -er --arg id '$(host)' '.[$$id] // error("unknown instance \($$id)") | "\(.user)@\(.host)"'
 DB_TUNNEL = scripts/db-tunnel.sh
+SECRET = scripts/secret.sh $(STATE_BUCKET)
 DB_TUNNEL_VARS = -var db_host=127.0.0.1 -var state_bucket=$(STATE_BUCKET)
 INFRA_APPLIED = $(INFRA_DIR)/.terraform/applied
 DB_APPLIED = $(DB_DIR)/.terraform/applied
@@ -58,8 +59,8 @@ infra-plan: ssh_key.pem ## Show pending infra and db changes
 	@$(DB_TUNNEL) terraform -chdir=$(DB_DIR) plan $(DB_TUNNEL_VARS)
 
 .PHONY: clean
-clean: ## Remove the local SSH key
-	rm -f ssh_key.pem
+clean: ## Remove the local SSH key and secrets
+	rm -f ssh_key.pem $(PFX) $(PFX_PASSWORD)
 
 .PHONY: destroy
 destroy: clean ## Tear down all infrastructure
@@ -118,7 +119,7 @@ ssh_key.pem: $(INFRA_APPLIED)
 	@(umask 077 && $(INFRA_OUTPUT) -raw ssh_private_key > $@)
 
 $(PFX_PASSWORD):
-	@(umask 077 && openssl rand -hex 32 > $@)
+	@$(SECRET) $@ openssl rand -hex 32 -out $@
 
 $(PFX): | $(PFX_PASSWORD)
-	@TODOAPP_CERTIFICATE_PASSWORD="$$(cat $(PFX_PASSWORD))" uvx --from "$(DEPLOY_SOURCE)" generate-certificate $@
+	@TODOAPP_CERTIFICATE_PASSWORD="$$(cat $(PFX_PASSWORD))" $(SECRET) $@ uvx --from "$(DEPLOY_SOURCE)" generate-certificate $@

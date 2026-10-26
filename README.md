@@ -27,7 +27,10 @@ someone who already has access runs `git-crypt add-gpg-user <key-id>` and
 commits the result.
 
 - `secrets/dataprotection.pfx` and its password are the app's ASP.NET Core
-  data protection certificate. `make deploy-app` generates them if missing.
+  data protection certificate. They are kept in the state bucket under the
+  same paths. `make deploy-app` downloads them, or generates and uploads them
+  when the bucket has none. The local copies are ignored by git and removed by
+  `make clean`.
 - `ssh_key.pem` is the SSH key shared by all instances. It is written from the
   terraform state on demand, ignored by git, and removed by `make clean`.
 

@@ -3,3 +3,4 @@ tf/*/terraform.tfstate.*backup
 tf/*/.terraform.tfstate.lock.info
 tf_outputs.json
 ssh_key.pem
+secrets/
