@@ -9,22 +9,19 @@ Run `make` to list the available commands.
 
 ## Prerequisites
 
-- [git-crypt](https://github.com/AGWA/git-crypt) and a GPG key that has been
-  added to this repository
 - [Terraform](https://developer.hashicorp.com/terraform/install) 1.16 or newer
 - AWS CLI with credentials for the account
 - Docker, `jq`, `ssh`, [uv](https://docs.astral.sh/uv/) and GNU make
 
-Then run `make setup` once to unlock the secrets, create the state bucket and
-initialise terraform. Nothing in the repository names an AWS account: the
-targets act on whichever account your AWS credentials belong to. Run
-`make setup` again after switching accounts.
+Then run `make setup` once to create the state bucket and initialise
+terraform. Nothing in the repository names an AWS account: the targets act on
+whichever account your AWS credentials belong to. Run `make setup` again after
+switching accounts.
 
 ## Secrets
 
-git-crypt encrypts `secrets/`, see `.gitattributes`. Access is per GPG key:
-someone who already has access runs `git-crypt add-gpg-user <key-id>` and
-commits the result.
+No secrets are kept in git. They live in the state bucket or in the terraform
+state, so anyone who can read the bucket can read them.
 
 - `secrets/dataprotection.pfx` and its password are the app's ASP.NET Core
   data protection certificate. They are kept in the state bucket under the

@@ -38,8 +38,7 @@ help: ## Show this help
 	@awk 'BEGIN { FS = ":.*## " } /^[a-zA-Z_-]+:.*## / { printf "  %-16s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 .PHONY: setup
-setup: ## Unlock secrets, create the state bucket and initialise terraform
-	git-crypt unlock
+setup: ## Create the state bucket and initialise terraform
 	@bucket=$(STATE_BUCKET) && \
 	{ aws s3api head-bucket --bucket "$$bucket" 2>/dev/null || aws s3 mb "s3://$$bucket"; } && \
 	aws s3api put-bucket-versioning --bucket "$$bucket" --versioning-configuration Status=Enabled && \
