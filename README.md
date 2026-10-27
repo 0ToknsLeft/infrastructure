@@ -71,7 +71,9 @@ instance, with the `setup-tls` tool. Point the domain at the instance and deploy
 the app first.
 
 `make ssh host=<instance-id>` opens a shell on an instance. The instance ids
-are listed by `terraform -chdir=tf/infra output ec2_instances`.
+are listed by `make infra-state name=ec2_instances`. `make infra-state` lists
+the terraform outputs of both modules, hiding the sensitive ones, and
+`make infra-state name=<output>` shows the value of one, sensitive or not.
 
 ## Connecting to the database
 

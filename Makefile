@@ -34,6 +34,7 @@ PFX_PASSWORD=$(SECRETS_DIR)/dataprotection.password
 
 INFRA_FILES := $(call rwildcard,$(INFRA_DIR),*.tf)
 DB_FILES := $(call rwildcard,$(DB_DIR),*.tf)
+OUTPUT_DIR = $(dir $(shell grep -l '^output "$(name)"' $(INFRA_FILES) $(DB_FILES)))
 
 .DEFAULT_GOAL := help
 
@@ -64,6 +65,11 @@ infrastructure: ssh_key.pem ## Apply the infra and db terraform
 infra-plan: ssh_key.pem ## Show pending infra and db changes
 	@terraform -chdir=$(INFRA_DIR) plan
 	@$(DB_TUNNEL) terraform -chdir=$(DB_DIR) plan $(DB_TUNNEL_VARS)
+
+.PHONY: infra-state
+infra-state: ## Show the terraform outputs, or the value of one ([name=<output>])
+	$(if $(name),$(if $(OUTPUT_DIR),,$(error no terraform module has an output named $(name))))
+	@$(if $(name),terraform -chdir=$(OUTPUT_DIR) output $(name),$(INFRA_OUTPUT) && $(DB_OUTPUT))
 
 .PHONY: clean
 clean: ## Remove the local SSH key and secrets
