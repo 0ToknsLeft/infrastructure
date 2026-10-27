@@ -12,7 +12,8 @@ AWS_REGION := $(or $(shell aws configure get region),$(DEFAULT_AWS_REGION))
 endif
 export AWS_REGION
 export TF_VAR_aws_region = $(AWS_REGION)
-STATE_BUCKET = 0toks-infrastructure-$(shell aws sts get-caller-identity --query Account --output text)-$(AWS_REGION)
+AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --query Account --output text)
+STATE_BUCKET = 0toks-infrastructure-$(AWS_ACCOUNT_ID)-$(AWS_REGION)
 
 TF_DIR=tf
 INFRA_DIR=$(TF_DIR)/infra
@@ -42,9 +43,13 @@ help: ## Show this help
 
 .PHONY: setup
 setup: ## Create the state bucket and initialise terraform
+	@printf '%-12s %s\n' Account: '$(AWS_ACCOUNT_ID)' Region: '$(AWS_REGION)' 'App version:' '$(APP_VERSION)'
 	@bucket=$(STATE_BUCKET) && \
-	{ aws s3api head-bucket --bucket "$$bucket" 2>/dev/null || aws s3 mb "s3://$$bucket"; } && \
-	aws s3api put-bucket-versioning --bucket "$$bucket" --versioning-configuration Status=Enabled && \
+	if ! aws s3api head-bucket --bucket "$$bucket" 2>/dev/null; then \
+		read -rp "Create the state bucket $$bucket? [y/N] " answer && [[ $$answer == [yY] ]] && \
+		aws s3 mb "s3://$$bucket" && \
+		aws s3api put-bucket-versioning --bucket "$$bucket" --versioning-configuration Status=Enabled; \
+	fi && \
 	terraform -chdir=$(INFRA_DIR) init -reconfigure -lockfile=readonly -backend-config="bucket=$$bucket" && \
 	terraform -chdir=$(DB_DIR) init -reconfigure -lockfile=readonly -backend-config="bucket=$$bucket"
 	rm -f $(INFRA_APPLIED) $(DB_APPLIED)

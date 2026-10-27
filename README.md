@@ -15,9 +15,10 @@ Run `make` to list the available commands.
 - Docker, `jq`, `ssh`, [uv](https://docs.astral.sh/uv/) and GNU make
 
 Then run `make setup` once to create the state bucket and initialise
-terraform. Nothing in the repository names an AWS account: the targets act on
-whichever account your AWS credentials belong to. Run `make setup` again after
-switching accounts.
+terraform. It prints the account, region and app version it works with, and
+asks before creating the bucket. Nothing in the repository names an AWS
+account: the targets act on whichever account your AWS credentials belong to.
+Run `make setup` again after switching accounts.
 
 ## Secrets
 
