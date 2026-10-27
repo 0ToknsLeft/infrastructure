@@ -120,7 +120,7 @@ migrate: $(DB_APPLIED) ssh_key.pem ## Run database migrations
 db-tunnel: $(DB_APPLIED) ssh_key.pem ## Open a tunnel to the database and print connection details
 	@$(DB_TUNNEL)
 
-$(DB_APPLIED): $(INFRA_APPLIED) $(DB_FILES) ssh_key.pem
+$(DB_APPLIED): $(INFRA_APPLIED) $(DB_FILES) | ssh_key.pem
 	@$(DB_TUNNEL) terraform -chdir=$(DB_DIR) apply -auto-approve $(DB_TUNNEL_VARS)
 	@touch $@
 
