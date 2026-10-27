@@ -6,7 +6,10 @@ REPOSITORY=0toknsleft/todo-app
 APP_IMAGE = ghcr.io/$(REPOSITORY):$(APP_VERSION)
 DEPLOY_SOURCE = git+https://github.com/$(REPOSITORY)@v$(APP_VERSION)\#subdirectory=deploy
 
-AWS_REGION ?= eu-central-1
+DEFAULT_AWS_REGION=eu-central-1
+ifndef AWS_REGION
+AWS_REGION := $(or $(shell aws configure get region),$(DEFAULT_AWS_REGION))
+endif
 export AWS_REGION
 export TF_VAR_aws_region = $(AWS_REGION)
 STATE_BUCKET = 0toks-infrastructure-$(shell aws sts get-caller-identity --query Account --output text)-$(AWS_REGION)

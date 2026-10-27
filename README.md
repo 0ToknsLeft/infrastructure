@@ -1,9 +1,10 @@
 # Infrastructure
 
 Runs the [todo app](https://github.com/0toknsleft/todo-app) on AWS
-(`eu-central-1` unless `AWS_REGION` says otherwise): an EC2 instance serving
-HTTP on port 80, an RDS SQL Server Express database in private subnets, and the
-app's logs in CloudWatch (`/todoapp/app`).
+(in the region of your AWS profile, or `eu-central-1` if it has none): an EC2
+instance serving HTTP on port 80, an RDS SQL Server Express database in private
+subnets, and the app's logs in CloudWatch (`/todoapp/app`). Set `AWS_REGION` to
+use another region.
 
 Run `make` to list the available commands.
 
